@@ -21,13 +21,15 @@ FILE_MATCHES = {
 }
 
 class FileToBackup:
-    def __init__(self, file_info: Union[str, dict]):
-        if isinstance(file_info, dict):
-            self.path = Path(file_info['path'])
-            self.backup_root = file_info['backup_root']
-        else:
-            self.path = Path(file_info)
-            self.backup_root = self.path.name
+    def __init__(
+        self,
+        path: str,
+        backup_root: str | None = None,
+        backup_dir: str | None = None
+    ):
+        self.path = Path(path)
+        self.backup_root = backup_root if backup_root else self.path.name
+        self.backup_dir = backup_dir if backup_dir else self.path.parent
 
     def backup(self, force: bool = False) -> str:
         latest_backup = self.get_latest_backup()
@@ -62,7 +64,7 @@ class FileToBackup:
 
     def make_backup_path(self) -> str:
         now = datetime.now()
-        return f'{self.path.parent}/{self.backup_root}_sauv_{now.year:04d}-{now.month:02d}-{now.day:02d}{self.path.suffix}'
+        return f'{self.backup_dir}/{self.backup_root}_sauv_{now.year:04d}-{now.month:02d}-{now.day:02d}{self.path.suffix}'
 
 def test_make_backup_path() -> None:
     now = datetime.now()
@@ -71,13 +73,22 @@ def test_make_backup_path() -> None:
     print(f"BACKUP PATH FOR '{file.path}': '{bkup_path}'")
     assert bkup_path == f"/home/test/file.txt_sauv_{now.year:04d}-{now.month:02d}-{now.day:02d}.txt"
     #
-    file = FileToBackup({
-        "path": "/home/test/file.txt",
-        "backup_root": "file",
-    })
+    file = FileToBackup(
+        path="/home/test/file.txt",
+        backup_root="file",
+    )
     bkup_path = file.make_backup_path()
     print(f"BACKUP PATH FOR '{file.path}': '{bkup_path}'")
     assert bkup_path == f"/home/test/file_sauv_{now.year:04d}-{now.month:02d}-{now.day:02d}.txt"
+    #
+    file = FileToBackup(
+        path="/home/test/file.txt",
+        backup_root="ivegotyourback",
+        backup_dir="/home/some-user/junk",
+    )
+    bkup_path = file.make_backup_path()
+    print(f"BACKUP PATH FOR '{file.path}': '{bkup_path}'")
+    assert bkup_path == f"/home/some-user/junk/ivegotyourback_sauv_{now.year:04d}-{now.month:02d}-{now.day:02d}.txt"
 
 
 if __name__ == '__main__':
