@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+from argparse import ArgumentParser
 from datetime import datetime, timedelta
 from pathlib import Path
 import shutil
@@ -7,18 +8,8 @@ import sys
 from typing import Union
 
 # syntax cron (tous les jours à 10h)
-# 0 10 * * * /Users/olivier.debbah/code/backup.py
+# 0 10 * * * {$HOME}/code/backup.py
 
-FILE_MATCHES = {
-    'notes_todo': {
-        'path': '/Users/olivier.debbah/notes_todo/notes_todo.txt',
-        'backup_root': 'notes_todo',
-    },
-    'sql': {
-        'path': '/Users/olivier.debbah/code/misc.sql',
-        'backup_root': 'misc.sql',
-    },
-}
 
 class FileToBackup:
     def __init__(
@@ -47,7 +38,7 @@ class FileToBackup:
         else:
             return 'PASSED'
 
-    def get_latest_backup(self) -> Union[dict, None]:
+    def get_latest_backup(self) -> dict | None:
         backup: Path = None
         backup_date: datetime = None
         for f in (
@@ -60,7 +51,10 @@ class FileToBackup:
             if backup is None or d > backup_date:
                 backup = f
                 backup_date = d
-        return {'file': backup, 'date': backup_date} if backup else None
+        if backup is not None:
+            return {'file': backup, 'date': backup_date}
+        backup = Path(self.path)
+        return {'file': backup, 'date': datetime.fromtimestamp(backup.stat().st_ctime)}
 
     def make_backup_path(self) -> str:
         now = datetime.now()
@@ -92,9 +86,20 @@ def test_make_backup_path() -> None:
 
 
 if __name__ == '__main__':
-    from argparse import ArgumentParser
+    FILE_MATCHES = {
+        'notes_todo': {
+            'path': f'{Path().home()}/notes_todo/notes_todo.txt',
+            'backup_root': 'notes_todo',
+        },
+        'sql': {
+            'path': f'{Path().home()}/code/misc.sql',
+            'backup_root': 'misc.sql',
+        },
+    }
+
     argparser = ArgumentParser("Personal File Backup")
-    argparser.add_argument("-p", "--path") # optional because of test arg
+    argparser.add_argument("-p", "--path", required=False) # optional because of test arg
+    argparser.add_argument("-r", "--backuproot", required=False) # optional
     argparser.add_argument("-f", "--force", action="store_true")
     argparser.add_argument("-t", "--test", action="store_true")
     args = argparser.parse_args()
@@ -108,7 +113,10 @@ if __name__ == '__main__':
     if args.path is None:
         print(f"default - try to backup all ({', '.join(FILE_MATCHES.keys())})")
         for file_info in FILE_MATCHES.values():
-            fb =FileToBackup(file_info)
+            fb = FileToBackup(
+                path=file_info["path"],
+                backup_root=file_info["backup_root"],
+            )
             print(fb.make_backup_path())
             fb.backup(args.force)
         sys.exit()
@@ -118,9 +126,17 @@ if __name__ == '__main__':
         file = FileToBackup(args.path)
         if file.path.is_file():                   # direct file path given
             backup_root = file.path.name
-            sys.exit(FileToBackup(args.path).backup(args.force))
+            sys.exit(
+                FileToBackup(
+                    path=args.path,
+                    backup_root=args.backuproot,
+                ).backup(args.force)
+            )
         sys.exit(f'ERROR: unknown file "{args.path}"')
 
     # case: given name is in FILE_MATCHES
-    bk_file = FileToBackup(FILE_MATCHES[args.path]).backup(args.force)
+    bk_file = FileToBackup(
+        path=FILE_MATCHES[args.path]["path"],
+        backup_root=FILE_MATCHES[args.path]["backup_root"],
+    ).backup(args.force)
     sys.exit(bk_file)
