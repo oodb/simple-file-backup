@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import shutil
 import sys
-from typing import Union
 
 # syntax cron (tous les jours à 10h)
 # 0 10 * * * {$HOME}/code/backup.py
